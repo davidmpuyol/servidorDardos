@@ -4,7 +4,7 @@ var app = express();
 app.use(express.static(__dirname+'/public'));
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
-
+/*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
     res.redirect(`https://${req.header('host')}${req.url}`)
@@ -12,10 +12,11 @@ app.use((req, res, next) => {
     next();
   }
 });
-/*
+*/
+
 app.get('*', function(req, res) {
-  res.sendFile(`${__dirname}/public/index.html`);
-});*/
+  res.redirect(`https://${req.header('host')}${req.url}`);
+});
 
 var datos = {
   local: {
