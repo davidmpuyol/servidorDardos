@@ -4,6 +4,13 @@ var app = express();
 app.use(express.static(__dirname+'/public'));
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
+
+/*
+MongoClient.connect(uri, function(err, db){
+  var bdatos = db.db("prueba");
+  console.log(bdatos);
+});
+*/
 /*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
