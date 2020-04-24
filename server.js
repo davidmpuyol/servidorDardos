@@ -4,14 +4,26 @@ var app = express();
 app.use(express.static(__dirname+'/public'));
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
-
+var usuariosConectados = {}
+function compruebaUsuarios(){
+    let idClientes = Object.keys(io.sockets.sockets)
+    let userDisc = []
+    console.log(idClientes)
+    Object.keys(usuariosConectados).forEach((user) => {
+      if(!idClientes.includes(usuariosConectados[user].id)){
+        userDisc.push(user)
+        delete usuariosConectados[user]
+      }
+    })
+    return userDisc
+}
 /*
 MongoClient.connect(uri, function(err, db){
   var bdatos = db.db("prueba");
   console.log(bdatos);
 });
 */
-/*
+
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
     res.redirect(`https://${req.header('host')}${req.url}`)
@@ -19,11 +31,11 @@ app.use((req, res, next) => {
     next();
   }
 });
-*/
 
-app.get('*', function(req, res) {
+
+/* app.get('*', function(req, res) {
   res.redirect(`https://${req.header('host')}${req.url}`);
-});
+}); */
 
 var datos = {
   local: {
@@ -56,7 +68,20 @@ function nuevaPartida(){
 }
 
 io.on('connection', function(socket){
-    console.log(socket.id+" conectado");
+      console.log(socket.id+" conectado");
+      socket.emit('user','estas conectado')
+      socket.on('userConected',(usr)=>{
+        usuariosConectados[usr] = {id:socket.id,ready:false};
+        console.log(usuariosConectados)
+        io.emit('listaUsuarios',usuariosConectados)
+      });
+      socket.on('mensaje',(msg) => {
+        console.log(msg)
+        if(msg.userDest == 'general')
+          io.emit('reenvio',msg)
+        else
+          io.sockets.in(msg['dest']).emit('reenvio',msg)
+      })
       socket.on('preparado', function() {
         console.log(socket.id+' preparado');
         socket.broadcast.emit('preparado');
@@ -72,8 +97,15 @@ io.on('connection', function(socket){
       });
       socket.on('disconnect', function() {
         console.log(socket.id+" desconectado");
+        let usuarioDesc = compruebaUsuarios()
+        io.emit('usuarioDesc',usuarioDesc)
         socket.broadcast.emit('bye');
       });
+      socket.on('checked',(clave) => {
+        console.log('entra en el checked')
+        usuariosConectados[clave].ready=!usuariosConectados[clave].ready
+        io.emit('cambEstado',clave)
+      })
       socket.on('comenzarPartida',function(){
         io.emit('comenzarPartida',datos);
       })
