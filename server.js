@@ -1,6 +1,8 @@
 process.env.PWD = process.cwd()
 var express = require("express");
 var app = express();
+var MongoClient = require("mongodb").MongoClient;
+var mongoURL = 'mongodb://marco:marcocuma@37.35.151.96:27017?authMechanism=SCRAM-SHA-1&authSource=admin';
 app.use(express.static(__dirname+'/public'));
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
@@ -17,12 +19,13 @@ function compruebaUsuarios(){
     })
     return userDisc
 }
-/*
-MongoClient.connect(uri, function(err, db){
-  var bdatos = db.db("prueba");
-  console.log(bdatos);
+
+MongoClient.connect(mongoURL, function(err, db) {
+  if (err) throw err;
+  console.log("Conectado al servidor");
+  db.close();
 });
-*/
+/*
 
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
