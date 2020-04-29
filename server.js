@@ -44,6 +44,7 @@ function codigo(){
   }
   return code;
 }
+
 //le introduces un string y te lo encipta
 function encriptar(password){
   return bcrypt.hash(password, saltRounds)
@@ -132,8 +133,8 @@ let IntervaloLogin = setInterval(function(){
       })
     });
 },1800000)
-/*
 
+/*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
     res.redirect(`https://${req.header('host')}${req.url}`)
@@ -147,37 +148,17 @@ app.use((req, res, next) => {
   res.redirect(`https://${req.header('host')}${req.url}`);
 }); */
 
-var datos = {
-  local: {
-    puntos: 501,
-    media: 0,
-    puntosHechos: 0,
-    nDardos: 0,
-    tiradas: [],
-  },
-  visitante: {
-    puntos: 501,
-    media: 0,
-    puntosHechos: 0,
-    nDardos: 0,
-    tiradas: [],
-  },
-  turno: "local",
-}
-var sigPartida = "visitante";
-
-var turno = "j1";
-
-function nuevaPartida(){
-  datos['local'].puntos = 501;
-  datos['local'].tiradas = [];
-  datos['visitante'].puntos = 501;
-  datos['visitante'].tiradas = [];
-  datos.turno = sigPartida;
-  sigPartida = sigPartida == "local" ? "visitante" : "local";
+function nuevaPartida(id){
+  partidas[id]['local'].puntos = 501;
+  partidas[id]['local'].tiradas = [];
+  partidas[id]['visitante'].puntos = 501;
+  partidas[id]['visitante'].tiradas = [];
+  partidas[id].turno = partidas[id].sigPartida;
+  partidas[id].sigPartida = partidas[id].sigPartida == "local" ? "visitante" : "local";
 }
 
-  
+var partidas = {};
+
 io.on('connection', function(socket){
       console.log(socket.id+" conectado");
       socket.emit('user','estas conectado')
@@ -227,22 +208,45 @@ io.on('connection', function(socket){
         io.emit('cambEstado',clave)
       })
       socket.on('comenzarPartida',function(){
-        io.emit('comenzarPartida',datos);
+        let id = codigo();
+        turno: "local"
+        partidas[id] = {
+          idPartida: id,
+          local: {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+          },
+          visitante: {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+          },
+          turno: "local",
+          sigPartida: "visitante"
+        }
+        io.emit('comenzarPartida',partidas[id]);
       })
       socket.on('tirada',function(data){
-        datos[datos.turno].puntos -= data.puntos;
-        datos[datos.turno].tiradas.push(data.puntos);
-        datos[datos.turno].nDardos += data.dardos;
-        datos[datos.turno].puntosHechos += data.puntos;
-        datos[datos.turno].media = (datos[datos.turno].puntosHechos/datos[datos.turno].nDardos*3).toFixed(2);
-        if(datos[datos.turno].puntos == 0){
-          io.emit('ganador', datos.turno);
-          nuevaPartida();
-          io.emit('comenzarPartida',datos);
+        let idPartida = data.idPartida;
+        let turno = data.turno;
+        partidas[idPartida][turno].puntos -= data.puntos;
+        partidas[idPartida][turno].tiradas.push(data.puntos);
+        partidas[idPartida][turno].nDardos += data.dardos;
+        partidas[idPartida][turno].puntosHechos += data.puntos;
+        partidas[idPartida][turno].media = (partidas[idPartida][turno].puntosHechos/partidas[idPartida][turno].nDardos*3).toFixed(2);
+        if(partidas[idPartida][turno].puntos == 0){
+          io.emit('ganador', partidas[idPartida].turno);
+          nuevaPartida(idPartida);
+          io.emit('comenzarPartida',partidas[idPartida]);
         }
         else{
-          datos.turno = datos.turno == "local" ? "visitante" : "local";
-          io.emit('tirada', datos);
+          partidas[idPartida].turno = partidas[idPartida].turno == "local" ? "visitante" : "local";
+          io.emit('tirada', partidas[idPartida]);
         }
       })
 });
