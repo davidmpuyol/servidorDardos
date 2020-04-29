@@ -2,7 +2,8 @@ process.env.PWD = process.cwd()
 var express = require("express");
 var app = express();
 var MongoClient = require("mongodb").MongoClient;
-var mongoURL = 'mongodb://marco:marcocuma@37.35.151.96:27017?authMechanism=SCRAM-SHA-1&authSource=admin';
+//var mongoURL = 'mongodb://marco:marcocuma@37.35.151.96:27017?authMechanism=SCRAM-SHA-1&authSource=admin';
+var mongoURL = 'mongodb://marco:marcocuma@192.168.1.80:27017?authMechanism=SCRAM-SHA-1&authSource=admin';
 app.use(express.static(__dirname+'/public'));
 var http = require('http').createServer(app);
 //Modulo de encriptación
@@ -158,6 +159,8 @@ function nuevaPartida(id){
 }
 
 var partidas = {};
+var idPartidas = {};
+
 
 io.on('connection', function(socket){
       console.log(socket.id+" conectado");
@@ -183,18 +186,21 @@ io.on('connection', function(socket){
       socket.on('logout',function(id){
         logout(id)
       })
-      socket.on('preparado', function() {
-        console.log(socket.id+' preparado');
-        socket.broadcast.emit('preparado');
+      socket.on('preparado', function(contrincante) {
+        console.log('preparado enviado a '+contrincante);
+        socket.to(usuariosConectados[contrincante].id).emit('preparado');
       });
-      socket.on('offer', function (message) {
-        socket.broadcast.emit('offer', message);
+      socket.on('offer', function (message, contrincante) {
+        console.log('offer');
+        socket.to(usuariosConectados[contrincante].id).emit('offer', message);
       });
-      socket.on('answer', function (message) {
-        socket.broadcast.emit('answer', message);
+      socket.on('answer', function (message,contrincante) {
+        console.log('answer');
+        socket.to(usuariosConectados[contrincante].id).emit('answer', message);
       });
-      socket.on('candidate', function (message) {
-        socket.broadcast.emit('candidate', message);
+      socket.on('candidate', function (message,contrincante) {
+        console.log('candidate');
+        socket.to(usuariosConectados[contrincante].id).emit('candidate', message);
       });
       socket.on('disconnect', function() {
         console.log(socket.id+" desconectado");
@@ -206,6 +212,17 @@ io.on('connection', function(socket){
         console.log('entra en el checked')
         usuariosConectados[clave].ready=!usuariosConectados[clave].ready
         io.emit('cambEstado',clave)
+      })
+      socket.on('invitar', function(usuario, invitador){
+        console.log(usuariosConectados);
+        console.log(usuario);
+        socket.to(usuariosConectados[usuario].id).emit('invitacion', invitador);
+      })
+      socket.on('aceptarInvitacion',function(usuario,invitador){
+        socket.to(usuariosConectados[usuario].id).emit('invitacionAceptada', invitador);
+      })
+      socket.on('aceptarInvitacion',function(usuario,invitador){
+        socket.to(usuariosConectados[usuario].id).emit('invitacionRechazada', invitador);
       })
       socket.on('comenzarPartida',function(){
         let id = codigo();
