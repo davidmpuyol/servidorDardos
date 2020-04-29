@@ -24,6 +24,13 @@ function compruebaUsuarios(){
     return userDisc
 }
 
+var dbo = null;
+var db = null;
+MongoClient.connect(mongoURL, (err, db)=>{
+  if (err) return err;
+  db = db;
+  dbo = db.db("dardos");
+})
 
 //Genera un codigo aleatorio que sera el localizador de la sesion del usuario con la base de datos
 function codigo(){
@@ -56,9 +63,6 @@ function comparar(password,passcript){
 }
 //loguea al usuario en la base de datos y le devuelve el codigo de la sesion.
 function login(mail ,password, socket){
-  MongoClient.connect(mongoURL, (err, db)=>{
-    if (err) return err;
-    var dbo = db.db("dardos");
     //obtengo los datos del usuario con ese mail de registro
     var query = { email: mail };
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
@@ -80,18 +84,14 @@ function login(mail ,password, socket){
         //cambia los datos en la bd y manda un evento al cliente para que este guarde el id de sesion para asi poder indentificarse
         dbo.collection("usuarios").updateOne(query, datos, (err, res)=>{
           if (err) return err;
-          db.close();
+          //db.close();
         });
         socket.emit('respLogin',user)
       }
     });
-  });
 }
 function comprobarSesion(id,socket){
   //Comprueba si hay una sesion con ese id abierta y manda los datos de vuelta al usuario
-  MongoClient.connect(mongoURL, (err, db)=>{
-    if (err) return err;
-    var dbo = db.db("dardos");
     let query = {online_id: id}
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
       console.log(result)
@@ -102,12 +102,8 @@ function comprobarSesion(id,socket){
         }
       }
     })
-  })
 }
 function logout(id){
-  MongoClient.connect(mongoURL, function(err, db) {
-    if (err) throw err;
-    var dbo = db.db("dardos");
     //obtengo los datos del usuario con ese mail de registro
     var query = { online_id: id };
     dbo.collection("usuarios").find(query).toArray(function(err, result) {
@@ -118,13 +114,9 @@ function logout(id){
             if (err) throw err;
           });
       })
-  });
 }
 //desloguea a los usuarios que llevan logueados mas de una hora
 let IntervaloLogin = setInterval(function(){
-  MongoClient.connect(mongoURL, function(err, db) {
-    if (err) throw err;
-    var dbo = db.db("dardos");
     //obtengo los datos del usuario con ese mail de registro
     var query = { online: true };
     dbo.collection("usuarios").find(query).toArray(function(err, result) {
@@ -139,7 +131,6 @@ let IntervaloLogin = setInterval(function(){
         }
       })
     });
-  });
 },1800000)
 /*
 
