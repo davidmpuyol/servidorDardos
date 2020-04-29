@@ -44,9 +44,9 @@ function encriptar(password){
       return hashedPassword;
   })
 }
-/*encriptar('prueba').then((respuesta)=>{
+/* encriptar('pedro').then((respuesta)=>{
   console.log(respuesta)
-})*/
+}) */
 
 //compara una contraseña con una contraseña encriptada
 function comparar(password,passcript){
