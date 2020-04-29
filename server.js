@@ -230,13 +230,16 @@ io.on('connection', function(socket){
           sigPartida: "visitante"
         }
         io.emit('comenzarPartida',partidas[id]);
+        console.log("nueva partida creada");
+        console.log(partidas[id]);
       })
       socket.on('tirada',function(data){
         let idPartida = data.idPartida;
-        let turno = data.turno;
+        let turno = partidas[idPartida].turno;
+        console.log(partidas.idPartida);
         partidas[idPartida][turno].puntos -= data.puntos;
         partidas[idPartida][turno].tiradas.push(data.puntos);
-        partidas[idPartida][turno].nDardos += data.dardos;
+        partidas[idPartida].turno.nDardos += data.dardos;
         partidas[idPartida][turno].puntosHechos += data.puntos;
         partidas[idPartida][turno].media = (partidas[idPartida][turno].puntosHechos/partidas[idPartida][turno].nDardos*3).toFixed(2);
         if(partidas[idPartida][turno].puntos == 0){
