@@ -24,6 +24,13 @@ function compruebaUsuarios(){
     return userDisc
 }
 
+var dbo = null;
+var db = null;
+MongoClient.connect(mongoURL, (err, db)=>{
+  if (err) return err;
+  db = db;
+  dbo = db.db("dardos");
+})
 
 //Genera un codigo aleatorio que sera el localizador de la sesion del usuario con la base de datos
 function codigo(){
@@ -37,6 +44,7 @@ function codigo(){
   }
   return code;
 }
+
 //le introduces un string y te lo encipta
 function encriptar(password){
   return bcrypt.hash(password, saltRounds)
@@ -56,9 +64,6 @@ function comparar(password,passcript){
 }
 //loguea al usuario en la base de datos y le devuelve el codigo de la sesion.
 function login(mail ,password, socket){
-  MongoClient.connect(mongoURL, (err, db)=>{
-    if (err) return err;
-    var dbo = db.db("dardos");
     //obtengo los datos del usuario con ese mail de registro
     var query = { email: mail };
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
@@ -80,18 +85,14 @@ function login(mail ,password, socket){
         //cambia los datos en la bd y manda un evento al cliente para que este guarde el id de sesion para asi poder indentificarse
         dbo.collection("usuarios").updateOne(query, datos, (err, res)=>{
           if (err) return err;
-          db.close();
+          //db.close();
         });
         socket.emit('respLogin',user)
       }
     });
-  });
 }
 function comprobarSesion(id,socket){
   //Comprueba si hay una sesion con ese id abierta y manda los datos de vuelta al usuario
-  MongoClient.connect(mongoURL, (err, db)=>{
-    if (err) return err;
-    var dbo = db.db("dardos");
     let query = {online_id: id}
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
       console.log(result)
@@ -102,12 +103,8 @@ function comprobarSesion(id,socket){
         }
       }
     })
-  })
 }
 function logout(id){
-  MongoClient.connect(mongoURL, function(err, db) {
-    if (err) throw err;
-    var dbo = db.db("dardos");
     //obtengo los datos del usuario con ese mail de registro
     var query = { online_id: id };
     dbo.collection("usuarios").find(query).toArray(function(err, result) {
@@ -118,13 +115,9 @@ function logout(id){
             if (err) throw err;
           });
       })
-  });
 }
 //desloguea a los usuarios que llevan logueados mas de una hora
 let IntervaloLogin = setInterval(function(){
-  MongoClient.connect(mongoURL, function(err, db) {
-    if (err) throw err;
-    var dbo = db.db("dardos");
     //obtengo los datos del usuario con ese mail de registro
     var query = { online: true };
     dbo.collection("usuarios").find(query).toArray(function(err, result) {
@@ -139,10 +132,9 @@ let IntervaloLogin = setInterval(function(){
         }
       })
     });
-  });
 },1800000)
-/*
 
+/*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
     res.redirect(`https://${req.header('host')}${req.url}`)
@@ -156,37 +148,17 @@ app.use((req, res, next) => {
   res.redirect(`https://${req.header('host')}${req.url}`);
 }); */
 
-var datos = {
-  local: {
-    puntos: 501,
-    media: 0,
-    puntosHechos: 0,
-    nDardos: 0,
-    tiradas: [],
-  },
-  visitante: {
-    puntos: 501,
-    media: 0,
-    puntosHechos: 0,
-    nDardos: 0,
-    tiradas: [],
-  },
-  turno: "local",
-}
-var sigPartida = "visitante";
-
-var turno = "j1";
-
-function nuevaPartida(){
-  datos['local'].puntos = 501;
-  datos['local'].tiradas = [];
-  datos['visitante'].puntos = 501;
-  datos['visitante'].tiradas = [];
-  datos.turno = sigPartida;
-  sigPartida = sigPartida == "local" ? "visitante" : "local";
+function nuevaPartida(id){
+  partidas[id]['local'].puntos = 501;
+  partidas[id]['local'].tiradas = [];
+  partidas[id]['visitante'].puntos = 501;
+  partidas[id]['visitante'].tiradas = [];
+  partidas[id].turno = partidas[id].sigPartida;
+  partidas[id].sigPartida = partidas[id].sigPartida == "local" ? "visitante" : "local";
 }
 
-  
+var partidas = {};
+
 io.on('connection', function(socket){
       console.log(socket.id+" conectado");
       socket.emit('user','estas conectado')
@@ -236,22 +208,48 @@ io.on('connection', function(socket){
         io.emit('cambEstado',clave)
       })
       socket.on('comenzarPartida',function(){
-        io.emit('comenzarPartida',datos);
+        let id = codigo();
+        turno: "local"
+        partidas[id] = {
+          idPartida: id,
+          local: {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+          },
+          visitante: {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+          },
+          turno: "local",
+          sigPartida: "visitante"
+        }
+        io.emit('comenzarPartida',partidas[id]);
+        console.log("nueva partida creada");
+        console.log(partidas[id]);
       })
       socket.on('tirada',function(data){
-        datos[datos.turno].puntos -= data.puntos;
-        datos[datos.turno].tiradas.push(data.puntos);
-        datos[datos.turno].nDardos += data.dardos;
-        datos[datos.turno].puntosHechos += data.puntos;
-        datos[datos.turno].media = (datos[datos.turno].puntosHechos/datos[datos.turno].nDardos*3).toFixed(2);
-        if(datos[datos.turno].puntos == 0){
-          io.emit('ganador', datos.turno);
-          nuevaPartida();
-          io.emit('comenzarPartida',datos);
+        let idPartida = data.idPartida;
+        let turno = partidas[idPartida].turno;
+        console.log(partidas.idPartida);
+        partidas[idPartida][turno].puntos -= data.puntos;
+        partidas[idPartida][turno].tiradas.push(data.puntos);
+        partidas[idPartida].turno.nDardos += data.dardos;
+        partidas[idPartida][turno].puntosHechos += data.puntos;
+        partidas[idPartida][turno].media = (partidas[idPartida][turno].puntosHechos/partidas[idPartida][turno].nDardos*3).toFixed(2);
+        if(partidas[idPartida][turno].puntos == 0){
+          io.emit('ganador', partidas[idPartida].turno);
+          nuevaPartida(idPartida);
+          io.emit('comenzarPartida',partidas[idPartida]);
         }
         else{
-          datos.turno = datos.turno == "local" ? "visitante" : "local";
-          io.emit('tirada', datos);
+          partidas[idPartida].turno = partidas[idPartida].turno == "local" ? "visitante" : "local";
+          io.emit('tirada', partidas[idPartida]);
         }
       })
 });
