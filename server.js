@@ -67,38 +67,85 @@ function login(mail ,password, socket){
     //obtengo los datos del usuario con ese mail de registro
     var query = { email: mail };
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
-      if (err) return err;
-      let criptpass = result[0].password
-      comparar(password , criptpass).then((result)=>{console.log(result)})
-      if (comparar(password , criptpass)){
+      if (result.length == 0)
+      //Si no devuelve un resultado manda un mensaje de error
+        socket.emit('errorLogin',"El usuario introducido no existe")
+      else{
+        let criptpass = result[0].password
+        comparar(password , criptpass).then((correcto)=>{
+          if (correcto){
 
-        //general el codigo aleatorio para identificar la sesion
-        let codigoRand =result[0].nick+codigo();
-
-        //crear una marca de tiempo para saber cuando se logueo
-        let time = Date.now()
-        let datos = {$set :{online: true, online_id: codigoRand, lastLogin: time}}
-        //obtiene los datos que mandara al cliente de vuelta
-
-        let user = {nick:result[0].nick,email:result[0].email,idSession:codigoRand}
-
-        //cambia los datos en la bd y manda un evento al cliente para que este guarde el id de sesion para asi poder indentificarse
-        dbo.collection("usuarios").updateOne(query, datos, (err, res)=>{
-          if (err) return err;
-          //db.close();
-        });
-        socket.emit('respLogin',user)
+            //general el codigo aleatorio para identificar la sesion
+            let codigoRand =result[0].nick+codigo();
+  
+            //crear una marca de tiempo para saber cuando se logueo
+            let time = Date.now()
+            let datos = {$set :{online: true, online_id: codigoRand, lastLogin: time}}
+            //obtiene los datos que mandara al cliente de vuelta
+  
+            let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,idSession:codigoRand}
+  
+            //cambia los datos en la bd y manda un evento al cliente para que este guarde el id de sesion para asi poder indentificarse
+            dbo.collection("usuarios").updateOne(query, datos, (err, res)=>{
+              if (err) return err;
+              //db.close();
+            });
+            socket.emit('respLogin',user)
+          } else {
+            //Si la contraseña no coincide manda un mensaje de error
+            socket.emit('errorLogin',"Esa contraseña no es la correcta")
+          }
+        })
       }
     });
+}
+//registra al usuario en la base de datos 
+function register(datos,socket){
+  //comprueba que el nick no esta cogido
+  dbo.collection('usuarios').find({nick:datos.nick}).toArray((err,result)=>{
+    if(result.length>0){
+      error = true
+      console.log('existe ese nick ')
+      socket.emit('resultadoRegistro',{error:"Ya existe un usuario con ese nick"})
+    }else{
+      //comprueba que el correo no se esta usando en otra cuenta
+      dbo.collection('usuarios').find({email:datos.email}).toArray((err2,result2)=>{
+        if(result2.length>0){
+          console.log('existe ese correo')
+          error = true
+          socket.emit('resultadoRegistro',{error:"Ya existe un usuario con ese correo"})
+        } else {
+          //Una vez comprobado todo inserta el usuario en la bd
+          encriptar(datos.password).then((passCript)=>{
+            let user = {nick:datos.nick, nombre:datos.nombre, email:datos.email, password:passCript,img:'default.png', tipo_usuario:0, online:false, online_id:'', lastLogin:''}
+            dbo.collection('usuarios').insertOne(user,function(err,result){
+              console.log(result.result.ok)
+              socket.emit('resultadoRegistro',{registrado:'Se ha registrado con exito'})
+              crearStats(datos.nick);
+            })
+          })
+        }
+      })
+    }
+  })
+}
+function crearStats(nick){
+  //Crea la tabla de estadisticas de un usuario dado
+  dbo.collection("usuarios").find({nick:nick}).toArray((err,result)=>{
+    let id = result[0]._id.toString()
+    let datos = {id_jugador:id,media:0,nDardos:0,nDerrotas:0,nPartidas:0,nVictorias:0,porcentajeVictorias:0}
+    dbo.collection('Estadistica_Jugador').insertOne(datos,function (err,result){
+      console.log('Tabla de estadisticas creada correctamente para '+nick)
+    })
+  })
 }
 function comprobarSesion(id,socket){
   //Comprueba si hay una sesion con ese id abierta y manda los datos de vuelta al usuario
     let query = {online_id: id}
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
-      console.log(result)
       if(result.length > 0){
         if(result[0].online == true){
-          let user = {nick:result[0].nick,email:result[0].email,idSession:id}
+          let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,idSession:id}
           socket.emit('respLogin',user)
         }
       }
@@ -163,7 +210,7 @@ io.on('connection', function(socket){
       console.log(socket.id+" conectado");
       socket.emit('user','estas conectado')
       socket.on('userConected',(usr)=>{
-        usuariosConectados[usr] = {id:socket.id,ready:false};
+        usuariosConectados[usr.nick] = {id:socket.id,ready:false,nick:usr.nick,img:usr.img};
         console.log(usuariosConectados)
         io.emit('listaUsuarios',usuariosConectados)
       });
@@ -176,6 +223,9 @@ io.on('connection', function(socket){
       })
       socket.on('login',function(datos){
         login(datos.email,datos.password,socket)
+      })
+      socket.on('register',function(datos){
+        register(datos,socket)
       })
       socket.on('comprobarSesion',function(id){
         comprobarSesion(id,socket)
@@ -205,7 +255,7 @@ io.on('connection', function(socket){
       socket.on('checked',(clave) => {
         console.log('entra en el checked')
         usuariosConectados[clave].ready=!usuariosConectados[clave].ready
-        io.emit('cambEstado',clave)
+        socket.broadcast.emit('cambEstado',clave)
       })
       socket.on('comenzarPartida',function(){
         let id = codigo();
