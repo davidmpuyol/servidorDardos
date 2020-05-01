@@ -71,8 +71,11 @@ function login(mail ,password, socket){
       //Si no devuelve un resultado manda un mensaje de error
         socket.emit('errorLogin',"El usuario introducido no existe")
       else{
-        let criptpass = result[0].password
-        comparar(password , criptpass).then((correcto)=>{
+        if(usuariosConectados[result[0].nick])
+          socket.emit('errorLogin',"El usuario ya esta logueado")
+        else{
+          let criptpass = result[0].password
+          comparar(password , criptpass).then((correcto)=>{
           if (correcto){
 
             //general el codigo aleatorio para identificar la sesion
@@ -96,6 +99,7 @@ function login(mail ,password, socket){
             socket.emit('errorLogin',"Esa contraseña no es la correcta")
           }
         })
+        }
       }
     });
 }
@@ -155,6 +159,7 @@ function logout(id){
     //obtengo los datos del usuario con ese mail de registro
     var query = { online_id: id };
     dbo.collection("usuarios").find(query).toArray(function(err, result) {
+          delete usuariosConectados[result[0].nick]
           let datos = {$set :{online: false, online_id: ''}}
           let user = result[0]
           //cambia los datos en la bd y manda un evento al cliente para que este guarde el id de sesion para asi poder indentificarse
@@ -171,6 +176,7 @@ let IntervaloLogin = setInterval(function(){
       result.forEach((user)=>{
         if((Date.now()-user.lastLogin)>3600000){
           let datos = {$set :{online: false, online_id: ''}}
+          delete usuariosConectados[result[0].nick]
           //cambia los datos en la bd y manda un evento al cliente para que este guarde el id de sesion para asi poder indentificarse
           dbo.collection("usuarios").updateOne(user, datos, function(err, res) {
             if (err) throw err;
@@ -205,7 +211,7 @@ function nuevaPartida(id){
 }
 
 var partidas = {};
-
+var idPartidas = {};
 io.on('connection', function(socket){
       console.log(socket.id+" conectado");
       socket.emit('user','estas conectado')
@@ -233,18 +239,21 @@ io.on('connection', function(socket){
       socket.on('logout',function(id){
         logout(id)
       })
-      socket.on('preparado', function() {
-        console.log(socket.id+' preparado');
-        socket.broadcast.emit('preparado');
+      socket.on('preparado', function(contrincante) {
+        console.log('preparado enviado a '+contrincante);
+        socket.to(usuariosConectados[contrincante].id).emit('preparado');
       });
-      socket.on('offer', function (message) {
-        socket.broadcast.emit('offer', message);
+      socket.on('offer', function (message, contrincante) {
+        console.log('offer');
+        socket.to(usuariosConectados[contrincante].id).emit('offer', message);
       });
-      socket.on('answer', function (message) {
-        socket.broadcast.emit('answer', message);
+      socket.on('answer', function (message,contrincante) {
+        console.log('answer');
+        socket.to(usuariosConectados[contrincante].id).emit('answer', message);
       });
-      socket.on('candidate', function (message) {
-        socket.broadcast.emit('candidate', message);
+      socket.on('candidate', function (message,contrincante) {
+        console.log('candidate');
+        socket.to(usuariosConectados[contrincante].id).emit('candidate', message);
       });
       socket.on('disconnect', function() {
         console.log(socket.id+" desconectado");
@@ -256,6 +265,17 @@ io.on('connection', function(socket){
         console.log('entra en el checked')
         usuariosConectados[clave].ready=!usuariosConectados[clave].ready
         socket.broadcast.emit('cambEstado',clave)
+      })
+      socket.on('invitar', function(usuario, invitador){
+        console.log(usuariosConectados);
+        console.log(usuario);
+        socket.to(usuariosConectados[usuario].id).emit('invitacion', invitador);
+      })
+      socket.on('aceptarInvitacion',function(usuario,invitador){
+        socket.to(usuariosConectados[usuario].id).emit('invitacionAceptada', invitador);
+      })
+      socket.on('aceptarInvitacion',function(usuario,invitador){
+        socket.to(usuariosConectados[usuario].id).emit('invitacionRechazada', invitador);
       })
       socket.on('comenzarPartida',function(){
         let id = codigo();
