@@ -187,6 +187,28 @@ let IntervaloLogin = setInterval(function(){
     });
 },1800000)
 
+function obtenerDatosPerfil(nick,conexion){
+  let query = {nick: nick}
+  let datos = "Vacio"
+  dbo.collection('usuarios').find(query).toArray(function(err, result){
+    if(result.length > 0){
+      let query2 = {id_jugador: result[0]._id.toString()}
+      dbo.collection('Estadistica_Jugador').find(query2).toArray(function(err, result2){
+        console.log(result2)
+        if(result2.length > 0){
+          datos = {img: result[0].img, tipo_usuario: result[0].tipo_usuario, media: result2[0].media, nDardos: result2[0].nDardos, nDerrotas: result2[0].nDerrotas,
+          nPartidas: result2[0].nPartidas, nVictorias: result2[0].nVictorias, porcentajeVictorias: result2[0].porcentajeVictorias}
+          console.log(datos)
+          conexion.emit("respDatosPerfil", datos)
+        } else {
+          conexion.emit("respDatosPerfil", {error: "No se ha podido acceder a la puntuacion del jugador"})
+        }
+      })
+    } else {
+      conexion.emit("respDatosPerfil", {error: "No se ha podido acceder a los datos del jugador"})
+    }
+  })
+}
 /*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
@@ -227,6 +249,11 @@ io.on('connection', function(socket){
         else
           io.sockets.in(msg['dest']).emit('reenvio',msg)
       })
+      socket.on('solicitarDatosPerfil',(nick)=>{
+        console.log(nick)
+        obtenerDatosPerfil(nick,socket)
+      })
+      //Eventos relacionados con la sesion
       socket.on('login',function(datos){
         login(datos.email,datos.password,socket)
       })
@@ -239,6 +266,18 @@ io.on('connection', function(socket){
       socket.on('logout',function(id){
         logout(id)
       })
+      socket.on('disconnect', function() {
+        console.log(socket.id+" desconectado");
+        let usuarioDesc = compruebaUsuarios()
+        io.emit('usuarioDesc',usuarioDesc)
+        socket.broadcast.emit('bye');
+      });
+      socket.on('checked',(clave) => {
+        console.log('entra en el checked')
+        usuariosConectados[clave].ready=!usuariosConectados[clave].ready
+        socket.broadcast.emit('cambEstado',clave)
+      });
+      //Eventos relacionados con la partida
       socket.on('preparado', function(contrincante) {
         console.log('preparado enviado a '+contrincante);
         socket.to(usuariosConectados[contrincante].id).emit('preparado');
@@ -255,17 +294,6 @@ io.on('connection', function(socket){
         console.log('candidate');
         socket.to(usuariosConectados[contrincante].id).emit('candidate', message);
       });
-      socket.on('disconnect', function() {
-        console.log(socket.id+" desconectado");
-        let usuarioDesc = compruebaUsuarios()
-        io.emit('usuarioDesc',usuarioDesc)
-        socket.broadcast.emit('bye');
-      });
-      socket.on('checked',(clave) => {
-        console.log('entra en el checked')
-        usuariosConectados[clave].ready=!usuariosConectados[clave].ready
-        socket.broadcast.emit('cambEstado',clave)
-      })
       socket.on('invitar', function(usuario, invitador){
         console.log(usuariosConectados);
         console.log(usuario);
