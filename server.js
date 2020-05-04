@@ -231,12 +231,15 @@ function nuevaPartida(id){
   partidas[id].turno = partidas[id].sigPartida;
   partidas[id].sigPartida = partidas[id].sigPartida == "local" ? "visitante" : "local";
 }
-
 var partidas = {};
 var idPartidas = {};
 io.on('connection', function(socket){
       console.log(socket.id+" conectado");
       socket.emit('user','estas conectado')
+      socket.on('paginaJuego',function(user){
+        console.log(user+" preparado para jugar");
+        idPartidas[user] = { id: socket.id};
+      })
       socket.on('userConected',(usr)=>{
         usuariosConectados[usr.nick] = {id:socket.id,ready:false,nick:usr.nick,img:usr.img};
         console.log(usuariosConectados)
@@ -280,19 +283,21 @@ io.on('connection', function(socket){
       //Eventos relacionados con la partida
       socket.on('preparado', function(contrincante) {
         console.log('preparado enviado a '+contrincante);
-        socket.to(usuariosConectados[contrincante].id).emit('preparado');
+        if(idPartidas[contrincante]){
+          socket.to(idPartidas[contrincante].id).emit('preparado');
+        }
       });
       socket.on('offer', function (message, contrincante) {
         console.log('offer');
-        socket.to(usuariosConectados[contrincante].id).emit('offer', message);
+        socket.to(idPartidas[contrincante].id).emit('offer', message);
       });
       socket.on('answer', function (message,contrincante) {
         console.log('answer');
-        socket.to(usuariosConectados[contrincante].id).emit('answer', message);
+        socket.to(idPartidas[contrincante].id).emit('answer', message);
       });
       socket.on('candidate', function (message,contrincante) {
         console.log('candidate');
-        socket.to(usuariosConectados[contrincante].id).emit('candidate', message);
+        socket.to(idPartidas[contrincante].id).emit('candidate', message);
       });
       socket.on('invitar', function(usuario, invitador){
         console.log(usuariosConectados);
