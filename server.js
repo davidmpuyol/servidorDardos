@@ -143,6 +143,23 @@ function crearStats(nick){
     })
   })
 }
+
+function crearTorneo(datos){
+  //Función crearTorneo: datos = {nombre:'',creador:''}
+  dbo.collection("torneos").find({nombre:datos.nombre}).toArray((err,result)=>{
+    if(result.length>0){
+      //si hay algun torneo creado con ese nombre
+    } else {
+      let datosTorneo = {creador:datos.creador,fecha:Date.now(),nombre:datos.nombre,ganador:'',jugadores:[]}
+      dbo.collection('torneos').insertOne(datos,function (err,result){
+        console.log(result.result.ok);
+        //se ha registrado con exito
+        socket.emit('resultadoRegistroTorneo',{registrado:"El torneo se ha registrado con exito"})
+      })
+    }
+  })
+}
+
 function comprobarSesion(id,socket){
   //Comprueba si hay una sesion con ese id abierta y manda los datos de vuelta al usuario
     let query = {online_id: id}
