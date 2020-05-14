@@ -222,7 +222,7 @@ app.use((req, res, next) => {
 /* app.get('*', function(req, res) {
   res.redirect(`https://${req.header('host')}${req.url}`);
 }); */
-
+/*
 function nuevaPartida(id){
   partidas[id]['local'].puntos = 501;
   partidas[id]['local'].tiradas = [];
@@ -230,7 +230,7 @@ function nuevaPartida(id){
   partidas[id]['visitante'].tiradas = [];
   partidas[id].turno = partidas[id].sigPartida;
   partidas[id].sigPartida = partidas[id].sigPartida == "local" ? "visitante" : "local";
-}
+}*/
 var partidas = {};
 var idPartidas = {};
 io.on('connection', function(socket){
@@ -243,11 +243,11 @@ io.on('connection', function(socket){
           idPartidas[user].id = socket.id;
           if(idPartidas[user].partida){
             console.log(user+ " ya está en una partida");
-            partidas[idPartidas[user].partida].jugadores[user] = socket.id;
+            socket.emit('recarga');
           }
         }
         else{
-          idPartidas[user] = { id: socket.id };
+          idPartidas[user] = {id: socket.id}
         }
       })
       socket.on('userConected',(usr)=>{
@@ -326,30 +326,32 @@ io.on('connection', function(socket){
           id = codigo();
           partidas[id] = {
             idPartida: id,
-            jugadores: {},
-            local: {
-              puntos: 501,
-              media: 0,
-              puntosHechos: 0,
-              nDardos: 0,
-              tiradas: [],
-            },
-            visitante: {
-              puntos: 501,
-              media: 0,
-              puntosHechos: 0,
-              nDardos: 0,
-              tiradas: [],
-            },
-            turno: "local",
-            sigPartida: "visitante"
+            jugadores: [],
+            turno: usuario,
+            sigPartida: contrincante
           }
-          idPartidas[usuario].id = id;
-          idPartidas[contrincante].id = id;
-          partidas[id].jugadores[usuario] = usuariosConectados[usuario];
-          partidas[id].jugadores[usuario] = usuariosConectados[contrincante];
-          socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[id]);
+          partidas[id][usuario] = {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+            marcador: 0,
+          }
+          partidas[id][contrincante] = {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+            marcador: 0,
+          }
+          idPartidas[usuario].partida = id;
+          idPartidas[contrincante].partida = id;
+          partidas[id].jugadores = [usuario,contrincante];
+          socket.to(usuariosConectados[contrincante].id).emit('comenzarPartida',partidas[id]);
           socket.emit('comenzarPartida', partidas[id]);
+          socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[id]);
           console.log("nueva partida creada");
           partida = id;
           console.log(partidas[id]);
@@ -358,26 +360,33 @@ io.on('connection', function(socket){
           id = idPartidas[usuario].partida;
           console.log('la partida ya existe');
           console.log(partidas[id]);
-          socket.emit('comenzarPartida',partidas[idPartidas]);
+          socket.emit('comenzarPartida',partidas[id]);
           socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[id]);
         }
       })
       socket.on('tirada',function(data){
         let idPartida = data.idPartida;
         let turno = partidas[idPartida].turno;
-        console.log(partidas.idPartida);
+        console.log('tirada');
+        console.log(data);
+        console.log('partida antes de cambios');
+        console.log(partidas[idPartida]);
         partidas[idPartida][turno].puntos -= data.puntos;
         partidas[idPartida][turno].tiradas.push(data.puntos);
-        partidas[idPartida].turno.nDardos += data.dardos;
+        partidas[idPartida][turno].nDardos += data.dardos;
         partidas[idPartida][turno].puntosHechos += data.puntos;
         partidas[idPartida][turno].media = (partidas[idPartida][turno].puntosHechos/partidas[idPartida][turno].nDardos*3).toFixed(2);
+        console.log('partida despues de cambios');
+        console.log(partidas[idPartida])
         if(partidas[idPartida][turno].puntos == 0){
+          partidas[idPartida][turno].marcador += 1;
           io.emit('ganador', partidas[idPartida].turno);
           nuevaPartida(idPartida);
           io.emit('comenzarPartida',partidas[idPartida]);
         }
         else{
-          partidas[idPartida].turno = partidas[idPartida].turno == "local" ? "visitante" : "local";
+          let jugadores = partidas[idPartida].jugadores;
+          partidas[idPartida].turno = partidas[idPartida].turno == jugadores[0] ? jugadores[1] : jugadores[0];
           io.emit('tirada', partidas[idPartida]);
         }
       })
