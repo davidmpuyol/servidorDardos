@@ -86,8 +86,7 @@ function login(mail ,password, socket){
             let datos = {$set :{online: true, online_id: codigoRand, lastLogin: time}}
             //obtiene los datos que mandara al cliente de vuelta
   
-            let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,idSession:codigoRand}
-  
+            let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,idSession:codigoRand,tipo_usuario:result[0].tipo_usuario}
             //cambia los datos en la bd y manda un evento al cliente para que este guarde el id de sesion para asi poder indentificarse
             dbo.collection("usuarios").updateOne(query, datos, (err, res)=>{
               if (err) return err;
@@ -166,7 +165,7 @@ function comprobarSesion(id,socket){
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
       if(result.length > 0){
         if(result[0].online == true){
-          let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,idSession:id}
+          let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,tipo_usuario:result[0].tipo_usuario}
           socket.emit('respLogin',user)
         }
       }
@@ -268,7 +267,7 @@ io.on('connection', function(socket){
         }
       })
       socket.on('userConected',(usr)=>{
-        usuariosConectados[usr.nick] = {id:socket.id,ready:false,nick:usr.nick,img:usr.img};
+        usuariosConectados[usr.nick] = {id:socket.id,ready:false,nick:usr.nick,img:usr.img,tipo_usuario:usr.tipo_usuario};
         console.log(usuariosConectados)
         io.emit('listaUsuarios',usuariosConectados)
       });
