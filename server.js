@@ -225,6 +225,12 @@ function obtenerDatosPerfil(nick,conexion){
     }
   })
 }
+//Obtener torneos de la base de datos
+function obtenerTorneos(conexion){
+  dbo.collection("torneos").find().toArray(function(err, result) {
+    conexion.emit("resultadoTorneos",result)
+  });
+}
 /*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
@@ -306,6 +312,10 @@ io.on('connection', function(socket){
         usuariosConectados[clave].ready=!usuariosConectados[clave].ready
         socket.broadcast.emit('cambEstado',clave)
       });
+      //Evento para obtener torneos
+      socket.on('getTorneos',()=>{
+        obtenerTorneos(socket)
+      })
       //Eventos relacionados con la partida
       socket.on('preparado', function(contrincante) {
         console.log('preparado enviado a '+contrincante);
