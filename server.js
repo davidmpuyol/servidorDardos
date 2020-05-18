@@ -231,6 +231,7 @@ function obtenerTorneos(conexion){
     conexion.emit("resultadoTorneos",result)
   });
 }
+function detalleTorneo(conexion,id)
 /*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
