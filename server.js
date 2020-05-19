@@ -5,6 +5,7 @@ var MongoClient = require("mongodb").MongoClient;
 var mongoURL = 'mongodb://marco:marcocuma@168.63.17.113:27017?authMechanism=SCRAM-SHA-1&authSource=admin';
 app.use(express.static(__dirname+'/public'));
 var http = require('http').createServer(app);
+var ObjectId = require('mongodb').ObjectId
 //Modulo de encriptación
 const bcrypt = require('bcrypt');
 const saltRounds = 12;
@@ -165,7 +166,8 @@ function comprobarSesion(id,socket){
     dbo.collection("usuarios").find(query).toArray((err, result)=>{
       if(result.length > 0){
         if(result[0].online == true){
-          let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,tipo_usuario:result[0].tipo_usuario}
+          let user = {nick:result[0].nick,email:result[0].email,img:result[0].img,tipo_usuario:result[0].tipo_usuario,idSession:result[0].online_id}
+          console.log(result)
           socket.emit('respLogin',user)
         }
       }
@@ -231,7 +233,25 @@ function obtenerTorneos(conexion){
     conexion.emit("resultadoTorneos",result)
   });
 }
-function detalleTorneo(conexion,id)
+function detalleTorneo(conexion,id){
+  let query = {"_id":ObjectId(id)}
+  dbo.collection("torneos").find(query).toArray(function(err, torneo) {
+    conexion.emit("resultadoTorneo",torneo[0])
+  });
+}
+function apuntarseTorneo(id,nickJugador){
+  let query = {"_id":ObjectId(id)}
+  dbo.collection("torneos").find(query).toArray(function(err, torneo) {
+    let users = {jugadores:torneo[0].jugadores}
+    if(!users.jugadores.includes(nickJugador)){
+      users.jugadores.push(nickJugador)
+      dbo.collection("torneos").updateOne(query, {$push:{jugadores:nickJugador}}, function(err, res) {
+        if (err) throw err;
+        console.log('Datos modificados '+res)
+      });
+    }
+  });
+}
 /*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
@@ -316,6 +336,12 @@ io.on('connection', function(socket){
       //Evento para obtener torneos
       socket.on('getTorneos',()=>{
         obtenerTorneos(socket)
+      })
+      socket.on('detalleTorneo',(id)=>{
+        detalleTorneo(socket,id)
+      })
+      socket.on('apuntarseTorneo',(datos)=>{
+        apuntarseTorneo(datos.idTorneo,datos.nickJugador)
       })
       //Eventos relacionados con la partida
       socket.on('preparado', function(contrincante) {
