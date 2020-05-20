@@ -239,7 +239,7 @@ function detalleTorneo(conexion,id){
     conexion.emit("resultadoTorneo",torneo[0])
   });
 }
-function apuntarseTorneo(id,nickJugador){
+function apuntarseTorneo(conexion,id,nickJugador){
   let query = {"_id":ObjectId(id)}
   dbo.collection("torneos").find(query).toArray(function(err, torneo) {
     let users = {jugadores:torneo[0].jugadores}
@@ -248,7 +248,10 @@ function apuntarseTorneo(id,nickJugador){
       dbo.collection("torneos").updateOne(query, {$push:{jugadores:nickJugador}}, function(err, res) {
         if (err) throw err;
         console.log('Datos modificados '+res)
+        conexion.emit("respuestaApuntarse",{1:"Se ha apuntado correctamente"})
       });
+    } else {
+      conexion.emit("respuestaApuntarse",{0:"Ha ocurrido un error, puede que ya este en el torneo. Para asegurarse compruebe si esta en la lista"})
     }
   });
 }
@@ -341,7 +344,8 @@ io.on('connection', function(socket){
         detalleTorneo(socket,id)
       })
       socket.on('apuntarseTorneo',(datos)=>{
-        apuntarseTorneo(datos.idTorneo,datos.nickJugador)
+        console.log("entra en apuntar torneo")
+        apuntarseTorneo(socket,datos.idTorneo,datos.nickJugador)
       })
       //Eventos relacionados con la partida
       socket.on('preparado', function(contrincante) {
