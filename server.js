@@ -233,6 +233,12 @@ function obtenerTorneos(conexion){
     conexion.emit("resultadoTorneos",result)
   });
 }
+function obtenerTorneosCarousel(conexion){
+  let fNow = Date.now()
+  dbo.collection("torneos").find({fecha: {$gte: fNow}}).limit(6).toArray(function(err, result) {
+    conexion.emit("resultTorneosCarousel",result)
+  });
+}
 function detalleTorneo(conexion,id){
   let query = {"_id":ObjectId(id)}
   dbo.collection("torneos").find(query).toArray(function(err, torneo) {
@@ -346,6 +352,9 @@ io.on('connection', function(socket){
       socket.on('apuntarseTorneo',(datos)=>{
         console.log("entra en apuntar torneo")
         apuntarseTorneo(socket,datos.idTorneo,datos.nickJugador)
+      })
+      socket.on('getTorneosCarousel',()=>{
+        obtenerTorneosCarousel(socket)
       })
       //Eventos relacionados con la partida
       socket.on('preparado', function(contrincante) {
