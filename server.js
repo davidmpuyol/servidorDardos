@@ -1,6 +1,7 @@
 process.env.PWD = process.cwd()
 var express = require("express");
-var app = express();
+var siofu = require("socketio-file-upload");
+var app = express().use(siofu.router);
 var MongoClient = require("mongodb").MongoClient;
 var mongoURL = 'mongodb://marco:marcocuma@168.63.17.113:27017?authMechanism=SCRAM-SHA-1&authSource=admin';
 app.use(express.static(__dirname+'/public'));
@@ -8,7 +9,9 @@ var http = require('http').createServer(app);
 var ObjectId = require('mongodb').ObjectId
 //Modulo de encriptación
 const bcrypt = require('bcrypt');
+const fs = require('fs');
 const saltRounds = 12;
+    
 
 var io = require('socket.io')(http);
 var usuariosConectados = {}
@@ -261,6 +264,31 @@ function apuntarseTorneo(conexion,id,nickJugador){
     }
   });
 }
+function cambiarDatosPerfil(conexion,datos){
+  let query = {nick: datos.nick}
+    dbo.collection("usuarios").find(query).toArray((err, result)=>{
+        let criptpass = result[0].password
+        comparar(datos.pass, criptpass).then((correcto)=>{
+        if (correcto){
+          dbo.collection("usuarios").find({nick:datos.nuevoNick}).toArray((err, result)=>{
+            if(result.length == 0||datos.nick == datos.nuevoNick){
+              let datosModificar = {nick:datos.nuevoNick}
+              if(datos.img != "")
+                datosModificar.img=datos.img
+              dbo.collection("usuarios").updateOne(query,{$set:datosModificar},function(err, res) {
+                if (err) throw err;
+                console.log('Datos modificados '+res)
+                conexion.emit("respuestaCambioDatos",{1:"Datos modificados correctamente, recarga la pagina para verlos"})
+              });
+            } else {
+              conexion.emit("respuestaCambioDatos",{0:"Ya hay un usuario con ese nombre"})
+            }
+          });
+         
+        }           
+      })
+  });
+}
 /*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
@@ -286,6 +314,9 @@ function nuevaPartida(id){
 var partidas = {};
 var idPartidas = {};
 io.on('connection', function(socket){
+      var uploader = new siofu();
+      uploader.dir = "./public/img";
+      uploader.listen(socket);
       partida = null;
       console.log(socket.id+" conectado");
       socket.emit('user','estas conectado')
@@ -301,6 +332,15 @@ io.on('connection', function(socket){
         else{
           idPartidas[user] = {id: socket.id}
         }
+      })
+      uploader.on('saved',function(event){
+        console.log(event)
+        let dir = "./public/img"
+        fs.rename(event["file"]["pathName"], dir+event["file"]["meta"]["path"],(err) => {
+          if (err) throw err;
+          console.log('Rename complete!');
+          socket.emit('imagenSubida',event["file"]["meta"]["nombre"])
+        })
       })
       socket.on('userConected',(usr)=>{
         usuariosConectados[usr.nick] = {id:socket.id,ready:false,nick:usr.nick,img:usr.img,tipo_usuario:usr.tipo_usuario};
@@ -337,6 +377,9 @@ io.on('connection', function(socket){
         io.emit('usuarioDesc',usuarioDesc)
         socket.broadcast.emit('bye');
       });
+      socket.on('cambiarDatosPerfil',(datos)=>{
+        cambiarDatosPerfil(socket,datos)
+      })
       socket.on('checked',(clave) => {
         console.log('entra en el checked')
         usuariosConectados[clave].ready=!usuariosConectados[clave].ready
