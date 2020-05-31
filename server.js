@@ -289,6 +289,40 @@ function cambiarDatosPerfil(conexion,datos){
       })
   });
 }
+
+function almacenarPartida(datos){
+  /*
+  El parámetro de la funcion es partidas[id]
+  -- idPArtida -> datos.idPartida
+  datos de los jugadores
+  for jugador en datos.jugadores
+    datos[jugador]
+  partidas[id] = {
+            idPartida: id,
+            nPartidas: nPartidas,
+            partidasTotales: 0,
+            jugadores: [],
+            turno: salida,
+            sigPartida: contrincante
+          }
+          partidas[id][usuario] = {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+            marcador: 0,
+          }
+          partidas[id][contrincante] = {
+            puntos: 501,
+            media: 0,
+            puntosHechos: 0,
+            nDardos: 0,
+            tiradas: [],
+            marcador: 0,
+          }
+  */
+}
 /*
 app.use((req, res, next) => {
   if (req.header('x-forwarded-proto') !== 'https') {
@@ -426,17 +460,21 @@ io.on('connection', function(socket){
       socket.on('aceptarInvitacion',function(usuario,invitador){
         socket.to(usuariosConectados[usuario].id).emit('invitacionAceptada', invitador);
       })
-      socket.on('aceptarInvitacion',function(usuario,invitador){
+      socket.on('rechazarInvitacion',function(usuario,invitador){
         socket.to(usuariosConectados[usuario].id).emit('invitacionRechazada', invitador);
       })
-      socket.on('comenzarPartida',function(usuario, contrincante){
+      socket.on('comenzarPartida',function(usuario, contrincante, datosPartida){
         let id
+        let nPartidas = datosPartida.nPartidas;
+        let salida = datosPartida.salida;
         if(!idPartidas[usuario].partida){
           id = codigo();
           partidas[id] = {
             idPartida: id,
+            nPartidas: nPartidas,
+            partidasTotales: 0,
             jugadores: [],
-            turno: usuario,
+            turno: salida,
             sigPartida: contrincante
           }
           partidas[id][usuario] = {
@@ -489,9 +527,21 @@ io.on('connection', function(socket){
         console.log(partidas[idPartida])
         if(partidas[idPartida][turno].puntos == 0){
           partidas[idPartida][turno].marcador += 1;
-          io.emit('ganador', partidas[idPartida].turno);
-          nuevaPartida(idPartida);
-          io.emit('comenzarPartida',partidas[idPartida]);
+          socket.to(idPartidas[partidas[idPartida].jugadores[0]]).emit('ganador', partidas[idPartida].turno);
+          socket.to(idPartidas[partidas[idPartida].jugadores[1]]).emit('ganador', partidas[idPartida].turno);
+          //io.emit('ganador', partidas[idPartida].turno);
+          partidas[idPartida].partidasTotales++;
+          if(partidas[idPartida].nPartidas == partidas[idPartida].partidasTotales){
+            almacenarPartida(partida[idPartida]);
+            socket.to(idPartidas[partidas[idPartida].jugadores[0]]).emit('findeljuego');
+            socket.to(idPartidas[partidas[idPartida].jugadores[1]]).emit('findeljuego');
+          }
+          else{
+            nuevaPartida(idPartida);
+            //io.emit('comenzarPartida',partidas[idPartida]);
+            socket.to(idPartidas[partidas[idPartida].jugadores[0]]).emit('comenzarPartida',partidas[idPartida]);
+            socket.to(idPartidas[partidas[idPartida].jugadores[1]]).emit('comenzarPartida',partidas[idPartida]);
+          }
         }
         else{
           let jugadores = partidas[idPartida].jugadores;
