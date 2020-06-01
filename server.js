@@ -147,21 +147,6 @@ function crearStats(nick){
   })
 }
 
-function crearTorneo(datos){
-  //Función crearTorneo: datos = {nombre:'',creador:''}
-  dbo.collection("torneos").find({nombre:datos.nombre}).toArray((err,result)=>{
-    if(result.length>0){
-      //si hay algun torneo creado con ese nombre
-    } else {
-      let datosTorneo = {creador:datos.creador,fecha:Date.now(),nombre:datos.nombre,ganador:'',jugadores:[]}
-      dbo.collection('torneos').insertOne(datos,function (err,result){
-        console.log(result.result.ok);
-        //se ha registrado con exito
-        socket.emit('resultadoRegistroTorneo',{registrado:"El torneo se ha registrado con exito"})
-      })
-    }
-  })
-}
 
 function comprobarSesion(id,socket){
   //Comprueba si hay una sesion con ese id abierta y manda los datos de vuelta al usuario
@@ -231,6 +216,36 @@ function obtenerDatosPerfil(nick,conexion){
   })
 }
 //Obtener torneos de la base de datos
+function crearTorneo(conexion,torneo){
+  let query = {nick: torneo.user}
+  console.log(torneo)
+  dbo.collection('usuarios').find(query).toArray(function(err, result){
+    if(result[0].tipo_usuario>=2){
+      let datosTorneo = {};
+      datosTorneo.nombre = torneo.nombre;
+      datosTorneo.img = torneo.img;
+      datosTorneo.fecha = torneo.fecha;
+      if(result[0].tipo_usuario == 4){
+        datosTorneo.tipo = 2
+        datosTorneo.creador = "sys"
+      } else {
+        datosTorneo.tipo = 1
+        datosTorneo.creador = torneo.user
+      }
+      datosTorneo.ganador = "";
+      datosTorneo.abierto = true;
+      datosTorneo.max_jugadores = torneo.maxJugadores;
+      datosTorneo.jugadores = []
+      dbo.collection('torneos').insertOne(datosTorneo,function (err,result){
+        console.log(result.result.ok);
+        //se ha registrado con exito
+        conexion.emit('respuestaRegistrarseTorneo',{1:"El torneo se ha registrado con exito"})
+      })
+    } else {
+      conexion.emit('respuestaRegistrarseTorneo',{0:"Tu usuario no tiene los permisos necesarios"})
+    }
+  });
+}
 function obtenerTorneos(conexion){
   dbo.collection("torneos").find().toArray(function(err, result) {
     conexion.emit("resultadoTorneos",result)
@@ -420,6 +435,9 @@ io.on('connection', function(socket){
         socket.broadcast.emit('cambEstado',clave)
       });
       //Evento para obtener torneos
+      socket.on('crearTorneo',(datos)=>{
+        crearTorneo(socket,datos)
+      })
       socket.on('getTorneos',()=>{
         obtenerTorneos(socket)
       })
