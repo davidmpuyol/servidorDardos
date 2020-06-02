@@ -200,7 +200,8 @@ function obtenerDatosPerfil(nick,conexion){
     if(result.length > 0){
       let query2 = {id_jugador: result[0]._id.toString()}
       dbo.collection('Estadistica_Jugador').find(query2).toArray(function(err, result2){
-        console.log(result2)
+        console.log("resultado perfil");
+        console.log(result)
         if(result2.length > 0){
           datos = {img: result[0].img, tipo_usuario: result[0].tipo_usuario, media: result2[0].media, nDardos: result2[0].nDardos, nDerrotas: result2[0].nDerrotas,
           nPartidas: result2[0].nPartidas, nVictorias: result2[0].nVictorias, porcentajeVictorias: result2[0].porcentajeVictorias}
@@ -260,22 +261,46 @@ function obtenerTorneosCarousel(conexion){
 function detalleTorneo(conexion,id){
   let query = {"_id":ObjectId(id)}
   dbo.collection("torneos").find(query).toArray(function(err, torneo) {
-    conexion.emit("resultadoTorneo",torneo[0])
+    if(torneo[0].jugadores.length > 0){
+      let queryJugadores = []
+      torneo[0].jugadores.forEach((jugador)=>{
+        queryJugadores.push(jugador)
+      })
+      dbo.collection('usuarios').find({"_id":{$in: queryJugadores}}).project({"nick": 1,"_id": 0}).toArray(function(err, result){
+        console.log(result)
+        torneo[0].jugadores = result
+        conexion.emit("resultadoTorneo",torneo[0])
+      });
+    } else {
+      conexion.emit("resultadoTorneo",torneo[0])
+    }
   });
 }
 function apuntarseTorneo(conexion,id,nickJugador){
+  let queryUser = {nick: nickJugador}
   let query = {"_id":ObjectId(id)}
-  dbo.collection("torneos").find(query).toArray(function(err, torneo) {
-    let users = {jugadores:torneo[0].jugadores}
-    if(!users.jugadores.includes(nickJugador)){
-      users.jugadores.push(nickJugador)
-      dbo.collection("torneos").updateOne(query, {$push:{jugadores:nickJugador}}, function(err, res) {
-        if (err) throw err;
-        console.log('Datos modificados '+res)
-        conexion.emit("respuestaApuntarse",{1:"Se ha apuntado correctamente"})
+  dbo.collection("usuarios").find(queryUser).toArray(function (err, usuario){
+    if(usuario.length > 0){
+      dbo.collection("torneos").find(query).toArray(function (err, torneo){
+        let users = {jugadores:torneo[0].jugadores}
+        let estaDentro = false
+        users.jugadores.forEach((userid)=>{
+          if(userid.equals(usuario[0]._id))
+            estaDentro = true
+        })
+        if(!estaDentro){
+          users.jugadores.push(usuario[0]._id)
+          dbo.collection("torneos").updateOne(query, {$push:{jugadores:usuario[0]._id}}, function(err, res) {
+            if (err) throw err;
+            console.log('Datos modificados '+res)
+            conexion.emit("respuestaApuntarse",{1:"Se ha apuntado correctamente"})
+          });
+        } else {
+          conexion.emit("respuestaApuntarse",{0:"Ha ocurrido un error, puede que ya este en el torneo. Para asegurarse compruebe si esta en la lista"})
+        }
       });
-    } else {
-      conexion.emit("respuestaApuntarse",{0:"Ha ocurrido un error, puede que ya este en el torneo. Para asegurarse compruebe si esta en la lista"})
+    }else{
+      conexion.emit("respuestaApuntarse",{0:"No se ha encontrado su usuario, pruebe a reiniciar la pagina"})  
     }
   });
 }
