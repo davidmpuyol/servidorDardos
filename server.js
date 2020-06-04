@@ -377,14 +377,33 @@ app.use((req, res, next) => {
   res.redirect(`https://${req.header('host')}${req.url}`);
 }); */
 /*
+partidas[id] = {
+            idPartida: id,
+            nPartidas: nPartidas,
+            partidasTotales: 0,
+            jugadores: [],
+            turno: salida,
+            sigPartida: contrincante
+          }
+*/
+
 function nuevaPartida(id){
-  partidas[id]['local'].puntos = 501;
-  partidas[id]['local'].tiradas = [];
-  partidas[id]['visitante'].puntos = 501;
-  partidas[id]['visitante'].tiradas = [];
-  partidas[id].turno = partidas[id].sigPartida;
-  partidas[id].sigPartida = partidas[id].sigPartida == "local" ? "visitante" : "local";
-}*/
+  let partida = partidas[id];
+
+  jugador1 = partida.jugadores[0];
+  partida[jugador1].puntos = 501;
+  partida[jugador1],tiradas = [];
+
+  jugador2 = partida.jugadores[1];
+  partida[jugador2].puntos = 501;
+  partida[jugador2],tiradas = [];
+
+  partida.turno = partida.sigPartida;
+  partida.sigPartida = partida.sigPartida == jugador1 ? jugador2 : jugador1;
+  partidas[id] = partida;
+}
+
+
 var partidas = {};
 var idPartidas = {};
 io.on('connection', function(socket){
@@ -539,9 +558,10 @@ io.on('connection', function(socket){
           idPartidas[usuario].partida = id;
           idPartidas[contrincante].partida = id;
           partidas[id].jugadores = [usuario,contrincante];
-          socket.to(usuariosConectados[contrincante].id).emit('comenzarPartida',partidas[id]);
+          //socket.to(usuariosConectados[contrincante].id).emit('comenzarPartida',partidas[id]);
           socket.emit('comenzarPartida', partidas[id]);
           socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[id]);
+          socket.to(idPartidas[usuario].id).emit('comenzarPartida',partidas[id]);
           console.log("nueva partida creada");
           partida = id;
           console.log(partidas[id]);
@@ -552,9 +572,10 @@ io.on('connection', function(socket){
           console.log(partidas[id]);
           socket.emit('comenzarPartida',partidas[id]);
           socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[id]);
+          socket.to(idPartidas[usuario].id).emit('comenzarPartida',partidas[id]);
         }
       })
-      socket.on('tirada',function(data){
+      socket.on('tirada',function(data, usuario, contrincante){
         let idPartida = data.idPartida;
         let turno = partidas[idPartida].turno;
         console.log('tirada');
@@ -570,26 +591,30 @@ io.on('connection', function(socket){
         console.log(partidas[idPartida])
         if(partidas[idPartida][turno].puntos == 0){
           partidas[idPartida][turno].marcador += 1;
-          socket.to(idPartidas[partidas[idPartida].jugadores[0]]).emit('ganador', partidas[idPartida].turno);
-          socket.to(idPartidas[partidas[idPartida].jugadores[1]]).emit('ganador', partidas[idPartida].turno);
+          socket.emit('ganador', partidas[idPartida].turno);
+          socket.to(idPartidas[contrincante]).emit('ganador', partidas[idPartida].turno);
           //io.emit('ganador', partidas[idPartida].turno);
           partidas[idPartida].partidasTotales++;
           if(partidas[idPartida].nPartidas == partidas[idPartida].partidasTotales){
-            almacenarPartida(partida[idPartida]);
-            socket.to(idPartidas[partidas[idPartida].jugadores[0]]).emit('findeljuego');
-            socket.to(idPartidas[partidas[idPartida].jugadores[1]]).emit('findeljuego');
+            console.log('Fin del juego');
+            socket.emit('findeljuego', partidas[idPartida]);
+            socket.to(idPartidas[contrincante].id).emit('findeljuego', partidas[idPartida]);
+            almacenarPartida(partidas[idPartida]);
+            delete partidas[idPartida];
           }
           else{
             nuevaPartida(idPartida);
+            console.log('Nueva Partida');
             //io.emit('comenzarPartida',partidas[idPartida]);
-            socket.to(idPartidas[partidas[idPartida].jugadores[0]]).emit('comenzarPartida',partidas[idPartida]);
-            socket.to(idPartidas[partidas[idPartida].jugadores[1]]).emit('comenzarPartida',partidas[idPartida]);
+            socket.emit('comenzarPartida',partidas[idPartida]);
+            socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[idPartida]);
           }
         }
         else{
           let jugadores = partidas[idPartida].jugadores;
           partidas[idPartida].turno = partidas[idPartida].turno == jugadores[0] ? jugadores[1] : jugadores[0];
-          io.emit('tirada', partidas[idPartida]);
+          socket.emit('tirada', partidas[idPartida]);
+          socket.to(idPartidas[contrincante].id).emit('tirada', partidas[idPartida]);
         }
       })
 });
