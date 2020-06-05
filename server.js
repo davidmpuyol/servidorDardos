@@ -192,6 +192,56 @@ let IntervaloLogin = setInterval(function(){
       })
     });
 },1800000)
+let IntervaloTorneos = setInterval(function(){
+  var query = {$and:[{abierto: true},{fecha:{$lt:Date.now()}}]};
+  dbo.collection("torneos").find(query).toArray(function(err, result) {
+    result.forEach((torneo)=>{
+      console.log(torneo)
+      //Comprueba que hay jugadores suficientes para hacer el torneo
+      if(torneo.jugadores.length >=2){
+        let queryJugadores = []
+        torneo.jugadores.forEach((jugador)=>{
+          queryJugadores.push(jugador)
+        })
+        //Obtiene los nombre de los jugadores de la base de datos
+        dbo.collection('usuarios').find({"_id":{$in: queryJugadores}}).project({"nick": 1,"_id": 0}).toArray(function(err, result){
+          let nickJugadores = result
+          console.log("Entra en el if")
+          console.log(nickJugadores)
+          //Genera la estructura json necesaria para el brackets-vue
+          let numeroJugadores = torneo.jugadores.length
+          let iteraciones= Math.ceil(numeroJugadores/2)
+          let cursorJugadores = 0
+          let bracket = []
+          bracket.push({games:[]})
+          for (let index = 0; index <= iteraciones-1; index++) {
+            if(!cursorJugadores+2 >= numeroJugadores){
+              let player1 = {id:cursorJugadores,name:nickJugadores[cursorJugadores].nick}
+              cursorJugadores++
+              let player2 = {id:cursorJugadores,name:nickJugadores[cursorJugadores].nick}
+              bracket[0].games.push({
+                player1:player1,
+                player2:player2,
+              })
+            }else{
+              bracket[0].games.push({
+                player1:{id:cursorJugadores,name:nickJugadores[cursorJugadores].nick},
+                player2:{id:null,name:null},
+              })
+            }
+            cursorJugadores++
+          }
+          //Actualiza el torneo en la base de datos rellenando el campo de brackets
+          let update = {$set :{bracket: bracket, abierto: false}}
+          dbo.collection("torneos").updateOne(torneo, update, function(err, res) {
+            if (err) throw err;
+            console.log('Datos modificados '+res)
+          });
+        });
+      }
+    })
+  });
+},50000)
 
 function obtenerDatosPerfil(nick,conexion){
   let query = {nick: nick}
@@ -237,6 +287,7 @@ function crearTorneo(conexion,torneo){
       datosTorneo.abierto = true;
       datosTorneo.max_jugadores = torneo.maxJugadores;
       datosTorneo.jugadores = []
+      datosTorneo.bracket = []
       dbo.collection('torneos').insertOne(datosTorneo,function (err,result){
         console.log(result.result.ok);
         //se ha registrado con exito
