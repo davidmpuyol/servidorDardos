@@ -266,6 +266,20 @@ function obtenerDatosPerfil(nick,conexion){
     }
   })
 }
+function obtenerPartidas(nick,conexion){
+  let query = {nick: nick}
+  dbo.collection('usuarios').find(query).toArray(function(err, result){
+    if(result.length > 0){
+      let queryPartidas = {"jugadores" : { $in : [result[0]._id]  } };
+      dbo.collection('partidas').find(queryPartidas).toArray(function(err, partidas){
+        console.log('hace el emit de las partidas')
+        conexion.emit("respuestaPartidas",partidas)
+      });
+    } else {
+      conexion.emit("respuestaPartidas", {error: "No se ha podido acceder a los datos del jugador"})
+    }
+  })
+}
 //Obtener torneos de la base de datos
 function crearTorneo(conexion,torneo){
   let query = {nick: torneo.user}
@@ -378,6 +392,15 @@ function cambiarDatosPerfil(conexion,datos){
          
         }           
       })
+  });
+};
+function obtenerUsuarios(conexion,usuarios){
+  let queryUsuarios = []
+  usuarios.forEach((id)=>{
+    queryUsuarios.push(ObjectId(id))
+  })
+  dbo.collection('usuarios').find({"_id":{$in: queryUsuarios}}).project({"nick": 1,"_id": 0}).toArray(function(err, result){
+    conexion.emit("repuestaNicksUsuarios",result)
   });
 }
 
@@ -502,9 +525,15 @@ io.on('connection', function(socket){
         console.log(nick)
         obtenerDatosPerfil(nick,socket)
       })
+      socket.on("obtenerPartidas",(nick)=>{
+        obtenerPartidas(nick,socket)
+      })
       //Eventos relacionados con la sesion
       socket.on('login',function(datos){
         login(datos.email,datos.password,socket)
+      })
+      socket.on('obtenerUsuarios',(usuarios)=>{
+        obtenerUsuarios(socket,usuarios)
       })
       socket.on('register',function(datos){
         register(datos,socket)
