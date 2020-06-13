@@ -140,7 +140,7 @@ function crearStats(nick){
   //Crea la tabla de estadisticas de un usuario dado
   dbo.collection("usuarios").find({nick:nick}).toArray((err,result)=>{
     let id = result[0]._id.toString()
-    let datos = {id_jugador:id,media:0,nDardos:0,nDerrotas:0,nPartidas:0,nVictorias:0,porcentajeVictorias:0}
+    let datos = {id_jugador:ObjectId(id),media:0,nDardos:0,nDerrotas:0,nPartidas:0,nVictorias:0,porcentajeVictorias:0}
     dbo.collection('Estadistica_Jugador').insertOne(datos,function (err,result){
       console.log('Tabla de estadisticas creada correctamente para '+nick)
     })
@@ -248,10 +248,10 @@ function obtenerDatosPerfil(nick,conexion){
   let datos = "Vacio"
   dbo.collection('usuarios').find(query).toArray(function(err, result){
     if(result.length > 0){
-      let query2 = {id_jugador: result[0]._id.toString()}
+      let query2 = {id_jugador: result[0]._id}
       dbo.collection('Estadistica_Jugador').find(query2).toArray(function(err, result2){
         console.log("resultado perfil");
-        console.log(result)
+        console.log(result2)
         if(result2.length > 0){
           datos = {img: result[0].img, tipo_usuario: result[0].tipo_usuario, media: result2[0].media, nDardos: result2[0].nDardos, nDerrotas: result2[0].nDerrotas,
           nPartidas: result2[0].nPartidas, nVictorias: result2[0].nVictorias, porcentajeVictorias: result2[0].porcentajeVictorias}
@@ -405,7 +405,146 @@ function obtenerUsuarios(conexion,usuarios){
 }
 
 function almacenarPartida(datos){
+
+  var partida = {};
+  partida.fecha = Date.now();
+  var nickJugador1 = datos.jugadores[0];
+  var nickJugador2 = datos.jugadores[1];
+  console.log(nickJugador1, nickJugador2);
+  var jugador1 = null;
+  var jugador2 = null;
+  //Obtenemos los datos del jugador 1
+  dbo.collection('usuarios').findOne({nick: nickJugador1}).then(result => {
+    jugador1 = result;
+    console.log(result);
+  //Obtenemos los datos del jugador 2
+    dbo.collection('usuarios').findOne({nick: nickJugador2}).then(result => {
+      jugador2 = result;
+      console.log(result);
+      //Comprobamos el ganador
+      let ganador = datos[nickJugador1] > datos[nickJugador2] ? jugador1 : jugador2;
+      partida.ganador = ObjectId(ganador._id);
+
+      partida.jugadores = [ObjectId(jugador1._id), ObjectId(jugador2._id)];
+      partida.numero_partidas = datos.nPartidas;
+      partida.puntuacion = [];
+      partida.puntuacion.push({
+        media: datos[nickJugador1].media,
+        rondasGanadas: datos[nickJugador1].marcador
+      });
+      partida.puntuacion.push({
+        media: datos[nickJugador2].media,
+        rondasGanadas: datos[nickJugador2].marcador
+      });
+
+      //Insertamos los datos de la partida en la base de datos
+      dbo.collection('partidas').insertOne(partida,function (err,result){
+        console.log("Partida insertada con exito");
+        //se ha registrado con exito
+      });
+
+      //Actualizamos los stats del jugador 1
+      dbo.collection('Estadistica_Jugador').findOne({"id_jugador": jugador1._id}).then(result => {
+        console.log(result);
+        let media = result.media;
+        let partidas = result.nPartidas;
+        let sumamedia = media*partidas;
+        result.nPartidas++;
+        sumamedia += datos[nickJugador1].media;
+        result.media =  (sumamedia*1.0) / result.nPartidas;
+        if(jugador1 == ganador){
+          result.nVictorias++;
+        }
+        else{
+          result.nDerrotas++;
+        }
+        console.log(result);
+        result.porcentajeVictorias = (result.nVictorias*1.0/result.nPartidas)*100;
+        let nuevosDatos = {
+          media: result.media,
+          porcertajeVictorias: result.porcentajeVictorias,
+          nPartidas: result.nPartidas,
+          nVictorias: result.nVictorias,
+          nDerrotas: result.nDerrotas
+        }
+        let query = {$set : nuevosDatos}
+        console.log(query);
+        dbo.collection("Estadistica_Jugador").updateOne({"id_jugador": jugador1._id}, query, (err, res)=>{
+          if (err) return err;
+          console.log("Estadisticas jugador 1 insertadas");
+        });
+      }).catch(error=>{console.log("error al actualizar las estadisticas de "+nickJugador1)});
+      //Actualizamos los stats del jugador 2
+      dbo.collection('Estadistica_Jugador').findOne({"id_jugador": jugador2._id}).then(result => {
+        console.log(result);
+        let media = result.media;
+        let partidas = result.nPartidas;
+        let sumamedia = media*partidas;
+        result.nPartidas++;
+        sumamedia += datos[nickJugador2].media;
+        result.media =  (sumamedia*1.0) / result.nPartidas;
+        console.log(media,partidas,sumamedia);
+        if(jugador2 == ganador){
+          result.nVictorias++;
+        }
+        else{
+          result.nDerrotas++;
+        }
+        result.porcentajeVictorias = (result.nVictorias*1.0/result.nPartidas)*100;
+        let nuevosDatos = {
+          media: result.media,
+          porcentajeVictorias: result.porcentajeVictorias,
+          nPartidas: result.nPartidas,
+          nVictorias: result.nVictorias,
+          nDerrotas: result.nDerrotas
+        }
+        console.log(nuevosDatos);
+        let query = {$set : nuevosDatos}
+        dbo.collection("Estadistica_Jugador").updateOne({"id_jugador": jugador2._id}, query, (err, res)=>{
+          if (err) return err;
+          console.log("Estadisticas jugador 1 insertadas");
+        });
+      }).catch(error=>{console.log("error al actualizar las estadisticas de "+nickJugador2)});;
+    });
+
+  });
+  
+/*
+  console.log("jugador 1");
+  console.log(jugador1)
+  console.log("jugador 2");
+  console.log(jugador2)
+  
   /*
+  let query = {nick: torneo.user}
+  console.log(torneo)
+  dbo.collection('usuarios').find(query).toArray(function(err, result){
+    if(result[0].tipo_usuario>=2){
+      let datosTorneo = {};
+      datosTorneo.nombre = torneo.nombre;
+      datosTorneo.img = torneo.img;
+      datosTorneo.fecha = torneo.fecha;
+      if(result[0].tipo_usuario == 4){
+        datosTorneo.tipo = 2
+        datosTorneo.creador = "sys"
+      } else {
+        datosTorneo.tipo = 1
+        datosTorneo.creador = torneo.user
+      }
+      datosTorneo.ganador = "";
+      datosTorneo.abierto = true;
+      datosTorneo.max_jugadores = torneo.maxJugadores;
+      datosTorneo.jugadores = []
+      datosTorneo.bracket = []
+      dbo.collection('torneos').insertOne(datosTorneo,function (err,result){
+        console.log(result.result.ok);
+        //se ha registrado con exito
+        conexion.emit('respuestaRegistrarseTorneo',{1:"El torneo se ha registrado con exito"})
+      })
+    } else {
+      conexion.emit('respuestaRegistrarseTorneo',{0:"Tu usuario no tiene los permisos necesarios"})
+    }
+  });
   El parámetro de la funcion es partidas[id]
   -- idPArtida -> datos.idPartida
   datos de los jugadores
@@ -673,7 +812,6 @@ io.on('connection', function(socket){
           partidas[idPartida][turno].marcador += 1;
           socket.emit('ganador', partidas[idPartida].turno);
           socket.to(idPartidas[contrincante]).emit('ganador', partidas[idPartida].turno);
-          //io.emit('ganador', partidas[idPartida].turno);
           partidas[idPartida].partidasTotales++;
           if(partidas[idPartida].nPartidas == partidas[idPartida].partidasTotales){
             console.log('Fin del juego');
@@ -685,7 +823,6 @@ io.on('connection', function(socket){
           else{
             nuevaPartida(idPartida);
             console.log('Nueva Partida');
-            //io.emit('comenzarPartida',partidas[idPartida]);
             socket.emit('comenzarPartida',partidas[idPartida]);
             socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[idPartida]);
           }
