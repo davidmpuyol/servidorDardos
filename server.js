@@ -18,7 +18,6 @@ var usuariosConectados = {}
 function compruebaUsuarios(){
     let idClientes = Object.keys(io.sockets.sockets)
     let userDisc = []
-    console.log(idClientes)
     Object.keys(usuariosConectados).forEach((user) => {
       if(!idClientes.includes(usuariosConectados[user].id)){
         userDisc.push(user)
@@ -243,18 +242,14 @@ let IntervaloLogin = setInterval(function(){
   });
 },50000)*/
 function actualizarBrackets(idTorneo,bracket){
-  console.log("llega a actualizar brackets")
-  console.log(idTorneo)
   let update = {$set :{bracket: bracket, abierto: false}}
   dbo.collection("torneos").updateOne({_id:ObjectId(idTorneo)}, update, function(err, res) {
     if (err) throw err;
-    console.log('Datos modificados '+res)
   });
 }
 function borrarTorneo(idTorneo){
   dbo.collection("torneos").deleteOne({_id:ObjectId(idTorneo)}, function(err, res) {
     if (err) throw err;
-    console.log('Torneo Elmininado '+res)
   });
 }
 
@@ -265,12 +260,9 @@ function obtenerDatosPerfil(nick,conexion){
     if(result.length > 0){
       let query2 = {id_jugador: result[0]._id}
       dbo.collection('Estadistica_Jugador').find(query2).toArray(function(err, result2){
-        console.log("resultado perfil");
-        console.log(result2)
         if(result2.length > 0){
           datos = {img: result[0].img, tipo_usuario: result[0].tipo_usuario, media: result2[0].media, nDardos: result2[0].nDardos, nDerrotas: result2[0].nDerrotas,
           nPartidas: result2[0].nPartidas, nVictorias: result2[0].nVictorias, porcentajeVictorias: result2[0].porcentajeVictorias}
-          console.log(datos)
           conexion.emit("respDatosPerfil", datos)
         } else {
           conexion.emit("respDatosPerfil", {error: "No se ha podido acceder a la puntuacion del jugador"})
@@ -287,7 +279,6 @@ function obtenerPartidas(nick,conexion){
     if(result.length > 0){
       let queryPartidas = {"jugadores" : { $in : [result[0]._id]  } };
       dbo.collection('partidas').find(queryPartidas).toArray(function(err, partidas){
-        console.log('hace el emit de las partidas')
         conexion.emit("respuestaPartidas",partidas)
       });
     } else {
@@ -298,7 +289,6 @@ function obtenerPartidas(nick,conexion){
 //Obtener torneos de la base de datos
 function crearTorneo(conexion,torneo){
   let query = {nick: torneo.user}
-  console.log(torneo)
   dbo.collection('usuarios').find(query).toArray(function(err, result){
     if(result[0].tipo_usuario>=2){
       let datosTorneo = {};
@@ -318,7 +308,6 @@ function crearTorneo(conexion,torneo){
       datosTorneo.jugadores = []
       datosTorneo.bracket = []
       dbo.collection('torneos').insertOne(datosTorneo,function (err,result){
-        console.log(result.result.ok);
         //se ha registrado con exito
         conexion.emit('respuestaRegistrarseTorneo',{1:"El torneo se ha registrado con exito"})
       })
@@ -347,7 +336,6 @@ function detalleTorneo(conexion,id){
         queryJugadores.push(jugador)
       })
       dbo.collection('usuarios').find({"_id":{$in: queryJugadores}}).project({"nick": 1,"_id": 0}).toArray(function(err, result){
-        console.log(result)
         torneo[0].jugadores = result
         conexion.emit("resultadoTorneo",torneo[0])
       });
@@ -372,7 +360,6 @@ function apuntarseTorneo(conexion,id,nickJugador){
           users.jugadores.push(usuario[0]._id)
           dbo.collection("torneos").updateOne(query, {$push:{jugadores:usuario[0]._id}}, function(err, res) {
             if (err) throw err;
-            console.log('Datos modificados '+res)
             conexion.emit("respuestaApuntarse",{1:"Se ha apuntado correctamente"})
           });
         } else {
@@ -397,7 +384,6 @@ function cambiarDatosPerfil(conexion,datos){
                 datosModificar.img=datos.img
               dbo.collection("usuarios").updateOne(query,{$set:datosModificar},function(err, res) {
                 if (err) throw err;
-                console.log('Datos modificados '+res)
                 conexion.emit("respuestaCambioDatos",{1:"Datos modificados correctamente, recarga la pagina para verlos"})
               });
             } else {
@@ -414,7 +400,7 @@ function obtenerUsuarios(conexion,usuarios){
   usuarios.forEach((id)=>{
     queryUsuarios.push(ObjectId(id))
   })
-  dbo.collection('usuarios').find({"_id":{$in: queryUsuarios}}).project({"nick": 1,"_id": 0}).toArray(function(err, result){
+  dbo.collection('usuarios').find({"_id":{$in: queryUsuarios}}).project({"nick": 1,"_id": 1}).toArray(function(err, result){
     conexion.emit("repuestaNicksUsuarios",result)
   });
 }
@@ -425,17 +411,14 @@ function almacenarPartida(datos){
   partida.fecha = Date.now();
   var nickJugador1 = datos.jugadores[0];
   var nickJugador2 = datos.jugadores[1];
-  console.log(nickJugador1, nickJugador2);
   var jugador1 = null;
   var jugador2 = null;
   //Obtenemos los datos del jugador 1
   dbo.collection('usuarios').findOne({nick: nickJugador1}).then(result => {
     jugador1 = result;
-    console.log(result);
   //Obtenemos los datos del jugador 2
     dbo.collection('usuarios').findOne({nick: nickJugador2}).then(result => {
       jugador2 = result;
-      console.log(result);
       //Comprobamos el ganador
       let ganador = datos[nickJugador1] > datos[nickJugador2] ? jugador1 : jugador2;
       partida.ganador = ObjectId(ganador._id);
@@ -454,13 +437,11 @@ function almacenarPartida(datos){
 
       //Insertamos los datos de la partida en la base de datos
       dbo.collection('partidas').insertOne(partida,function (err,result){
-        console.log("Partida insertada con exito");
         //se ha registrado con exito
       });
 
       //Actualizamos los stats del jugador 1
       dbo.collection('Estadistica_Jugador').findOne({"id_jugador": jugador1._id}).then(result => {
-        console.log(result);
         let media = result.media;
         let partidas = result.nPartidas;
         let sumamedia = media*partidas;
@@ -474,25 +455,21 @@ function almacenarPartida(datos){
         else{
           result.nDerrotas++;
         }
-        console.log(result);
         result.porcentajeVictorias = (result.nVictorias*1.0/result.nPartidas)*100;
         let nuevosDatos = {
           media: 75.80,
           porcertajeVictorias: result.porcentajeVictorias,
-          nPartidas: result.nPartidas,
+          nPartidas: nPartidas,
           nVictorias: result.nVictorias,
           nDerrotas: result.nDerrotas
         }
         let query = {$set : nuevosDatos}
-        console.log(query);
         dbo.collection("Estadistica_Jugador").updateOne({"id_jugador": jugador1._id}, query, (err, res)=>{
           if (err) return err;
-          console.log("Estadisticas jugador 1 insertadas");
         });
       }).catch(error=>{console.log("error al actualizar las estadisticas de "+nickJugador1)});
       //Actualizamos los stats del jugador 2
       dbo.collection('Estadistica_Jugador').findOne({"id_jugador": jugador2._id}).then(result => {
-        console.log(result);
         let media = result.media;
         let partidas = result.nPartidas;
         let sumamedia = media*partidas;
@@ -500,7 +477,6 @@ function almacenarPartida(datos){
         let nPartidas = result.nPartidas + 1;
         sumamedia += datos[nickJugador2].media;
         result.media =  sumamedia / nPartidas;
-        console.log(media,partidas,sumamedia);
         if(jugador2 == ganador){
           result.nVictorias++;
         }
@@ -515,11 +491,9 @@ function almacenarPartida(datos){
           nVictorias: result.nVictorias,
           nDerrotas: result.nDerrotas
         }
-        console.log(nuevosDatos);
         let query = {$set : nuevosDatos}
         dbo.collection("Estadistica_Jugador").updateOne({"id_jugador": jugador2._id}, query, (err, res)=>{
           if (err) return err;
-          console.log("Estadisticas jugador 1 insertadas");
         });
       }).catch(error=>{console.log("error al actualizar las estadisticas de "+nickJugador2)});;
     });
@@ -641,14 +615,12 @@ io.on('connection', function(socket){
       uploader.dir = "./public/img";
       uploader.listen(socket);
       partida = null;
-      console.log(socket.id+" conectado");
       socket.emit('user','estas conectado')
       socket.on('paginaJuego',function(user){
         console.log(user+" preparado para jugar");
         if(idPartidas[user]){
           idPartidas[user].id = socket.id;
           if(idPartidas[user].partida){
-            console.log(user+ " ya está en una partida");
             socket.emit('recarga');
           }
         }
@@ -657,28 +629,23 @@ io.on('connection', function(socket){
         }
       })
       uploader.on('saved',function(event){
-        console.log(event)
         let dir = "./public/img"
         fs.rename(event["file"]["pathName"], dir+event["file"]["meta"]["path"],(err) => {
           if (err) throw err;
-          console.log('Rename complete!');
           socket.emit('imagenSubida',event["file"]["meta"]["nombre"])
         })
       })
       socket.on('userConected',(usr)=>{
         usuariosConectados[usr.nick] = {id:socket.id,ready:false,nick:usr.nick,img:usr.img,tipo_usuario:usr.tipo_usuario};
-        console.log(usuariosConectados)
         io.emit('listaUsuarios',usuariosConectados)
       });
       socket.on('mensaje',(msg) => {
-        console.log(msg)
         if(msg.userDest == 'general')
           io.emit('reenvio',msg)
         else
           io.sockets.in(msg['dest']).emit('reenvio',msg)
       })
       socket.on('solicitarDatosPerfil',(nick)=>{
-        console.log(nick)
         obtenerDatosPerfil(nick,socket)
       })
       socket.on("obtenerPartidas",(nick)=>{
@@ -701,7 +668,6 @@ io.on('connection', function(socket){
         logout(id)
       })
       socket.on('disconnect', function() {
-        console.log(socket.id+" desconectado");
         let usuarioDesc = compruebaUsuarios()
         io.emit('usuarioDesc',usuarioDesc)
         socket.broadcast.emit('bye');
@@ -710,7 +676,6 @@ io.on('connection', function(socket){
         cambiarDatosPerfil(socket,datos)
       })
       socket.on('checked',(clave) => {
-        console.log('entra en el checked')
         usuariosConectados[clave].ready=!usuariosConectados[clave].ready
         socket.broadcast.emit('cambEstado',clave)
       });
@@ -725,14 +690,12 @@ io.on('connection', function(socket){
         detalleTorneo(socket,id)
       })
       socket.on('apuntarseTorneo',(datos)=>{
-        console.log("entra en apuntar torneo")
         apuntarseTorneo(socket,datos.idTorneo,datos.nickJugador)
       })
       socket.on('borrarTorneo',(id)=>{
         borrarTorneo(id)
       })
       socket.on('actualizarTorneo',(datos)=>{
-        console.log("llega a actualizar torneo")
         actualizarBrackets(datos.id,datos.bracket)
       })
       socket.on('getTorneosCarousel',()=>{
@@ -740,26 +703,20 @@ io.on('connection', function(socket){
       })
       //Eventos relacionados con la partida
       socket.on('preparado', function(contrincante) {
-        console.log('preparado enviado a '+contrincante);
         if(idPartidas[contrincante]){
           socket.to(idPartidas[contrincante].id).emit('preparado');
         }
       });
       socket.on('offer', function (message, contrincante) {
-        console.log('offer');
         socket.to(idPartidas[contrincante].id).emit('offer', message);
       });
       socket.on('answer', function (message,contrincante) {
-        console.log('answer');
         socket.to(idPartidas[contrincante].id).emit('answer', message);
       });
       socket.on('candidate', function (message,contrincante) {
-        console.log('candidate');
         socket.to(idPartidas[contrincante].id).emit('candidate', message);
       });
       socket.on('invitar', function(usuario, invitador){
-        console.log(usuariosConectados);
-        console.log(usuario);
         socket.to(usuariosConectados[usuario].id).emit('invitacion', invitador);
       })
       socket.on('aceptarInvitacion',function(usuario,invitador){
@@ -805,14 +762,10 @@ io.on('connection', function(socket){
           socket.emit('comenzarPartida', partidas[id]);
           socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[id]);
           socket.to(idPartidas[usuario].id).emit('comenzarPartida',partidas[id]);
-          console.log("nueva partida creada");
           partida = id;
-          console.log(partidas[id]);
         }
         else{
           id = idPartidas[usuario].partida;
-          console.log('la partida ya existe');
-          console.log(partidas[id]);
           socket.emit('comenzarPartida',partidas[id]);
           socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[id]);
           socket.to(idPartidas[usuario].id).emit('comenzarPartida',partidas[id]);
@@ -821,24 +774,17 @@ io.on('connection', function(socket){
       socket.on('tirada',function(data, usuario, contrincante){
         let idPartida = data.idPartida;
         let turno = partidas[idPartida].turno;
-        console.log('tirada');
-        console.log(data);
-        console.log('partida antes de cambios');
-        console.log(partidas[idPartida]);
         partidas[idPartida][turno].puntos -= data.puntos;
         partidas[idPartida][turno].tiradas.push(data.puntos);
         partidas[idPartida][turno].nDardos += data.dardos;
         partidas[idPartida][turno].puntosHechos += data.puntos;
         partidas[idPartida][turno].media = (partidas[idPartida][turno].puntosHechos/partidas[idPartida][turno].nDardos*3).toFixed(2);
-        console.log('partida despues de cambios');
-        console.log(partidas[idPartida])
         if(partidas[idPartida][turno].puntos == 0){
           partidas[idPartida][turno].marcador += 1;
           socket.emit('ganador', partidas[idPartida].turno);
           socket.to(idPartidas[contrincante]).emit('ganador', partidas[idPartida].turno);
           partidas[idPartida].partidasTotales++;
           if(partidas[idPartida].nPartidas == partidas[idPartida].partidasTotales){
-            console.log('Fin del juego');
             socket.emit('findeljuego', partidas[idPartida]);
             socket.to(idPartidas[contrincante].id).emit('findeljuego', partidas[idPartida]);
             almacenarPartida(partidas[idPartida]);
@@ -846,7 +792,6 @@ io.on('connection', function(socket){
           }
           else{
             nuevaPartida(idPartida);
-            console.log('Nueva Partida');
             socket.emit('comenzarPartida',partidas[idPartida]);
             socket.to(idPartidas[contrincante].id).emit('comenzarPartida',partidas[idPartida]);
           }
