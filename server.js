@@ -192,7 +192,7 @@ let IntervaloLogin = setInterval(function(){
       })
     });
 },1800000)
-let IntervaloTorneos = setInterval(function(){
+/*let IntervaloTorneos = setInterval(function(){
   var query = {$and:[{abierto: true},{fecha:{$lt:Date.now()}}]};
   dbo.collection("torneos").find(query).toArray(function(err, result) {
     result.forEach((torneo)=>{
@@ -241,7 +241,16 @@ let IntervaloTorneos = setInterval(function(){
       }
     })
   });
-},50000)
+},50000)*/
+function actualizarBrackets(idTorneo,bracket){
+  console.log("llega a actualizar brackets")
+  console.log(idTorneo)
+  let update = {$set :{bracket: bracket, abierto: false}}
+  dbo.collection("torneos").updateOne({_id:ObjectId(idTorneo)}, update, function(err, res) {
+    if (err) throw err;
+    console.log('Datos modificados '+res)
+  });
+}
 
 function obtenerDatosPerfil(nick,conexion){
   let query = {nick: nick}
@@ -710,6 +719,10 @@ io.on('connection', function(socket){
       socket.on('apuntarseTorneo',(datos)=>{
         console.log("entra en apuntar torneo")
         apuntarseTorneo(socket,datos.idTorneo,datos.nickJugador)
+      })
+      socket.on('actualizarTorneo',(datos)=>{
+        console.log("llega a actualizar torneo")
+        actualizarBrackets(datos.id,datos.bracket)
       })
       socket.on('getTorneosCarousel',()=>{
         obtenerTorneosCarousel(socket)
