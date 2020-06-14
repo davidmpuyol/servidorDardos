@@ -476,7 +476,7 @@ function almacenarPartida(datos){
         console.log(result);
         result.porcentajeVictorias = (result.nVictorias*1.0/result.nPartidas)*100;
         let nuevosDatos = {
-          media: result.media,
+          media: parseFloat(result.media).toFixed(2),
           porcertajeVictorias: result.porcentajeVictorias,
           nPartidas: result.nPartidas,
           nVictorias: result.nVictorias,
