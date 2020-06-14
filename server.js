@@ -464,9 +464,10 @@ function almacenarPartida(datos){
         let media = result.media;
         let partidas = result.nPartidas;
         let sumamedia = media*partidas;
-        result.nPartidas++;
+        //result.nPartidas++;
+        let nPartidas = result.nPartidas + 1;
         sumamedia += datos[nickJugador1].media;
-        result.media =  (sumamedia*1.0) / result.nPartidas;
+        result.media = sumamedia / nPartidas;
         if(jugador1 == ganador){
           result.nVictorias++;
         }
@@ -495,9 +496,10 @@ function almacenarPartida(datos){
         let media = result.media;
         let partidas = result.nPartidas;
         let sumamedia = media*partidas;
-        result.nPartidas++;
+        //result.nPartidas++;
+        let nPartidas = result.nPartidas + 1;
         sumamedia += datos[nickJugador2].media;
-        result.media =  (sumamedia*1.0) / result.nPartidas;
+        result.media =  sumamedia / nPartidas;
         console.log(media,partidas,sumamedia);
         if(jugador2 == ganador){
           result.nVictorias++;
