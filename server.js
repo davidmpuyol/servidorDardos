@@ -251,6 +251,12 @@ function actualizarBrackets(idTorneo,bracket){
     console.log('Datos modificados '+res)
   });
 }
+function borrarTorneo(idTorneo){
+  dbo.collection("torneos").deleteOne({_id:ObjectId(idTorneo)}, function(err, res) {
+    if (err) throw err;
+    console.log('Torneo Elmininado '+res)
+  });
+}
 
 function obtenerDatosPerfil(nick,conexion){
   let query = {nick: nick}
@@ -719,6 +725,9 @@ io.on('connection', function(socket){
       socket.on('apuntarseTorneo',(datos)=>{
         console.log("entra en apuntar torneo")
         apuntarseTorneo(socket,datos.idTorneo,datos.nickJugador)
+      })
+      socket.on('borrarTorneo',(id)=>{
+        borrarTorneo(id)
       })
       socket.on('actualizarTorneo',(datos)=>{
         console.log("llega a actualizar torneo")
